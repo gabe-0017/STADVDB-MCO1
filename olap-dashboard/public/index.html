@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bank Transactions Dashboard</title>
+  <link rel="stylesheet" href="/vendor/plex-sans/400.css">
+  <link rel="stylesheet" href="/vendor/plex-sans/500.css">
+  <link rel="stylesheet" href="/vendor/plex-sans/600.css">
+  <link rel="stylesheet" href="/vendor/plex-mono/400.css">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-name">Bank transactions</span>
+      <span class="brand-sub">Czech retail bank, 1993 to 1998</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Reports">
+      <h2 class="sidebar-title">Reports</h2>
+      <ul id="report-list" class="report-list"></ul>
+    </nav>
+
+    <main id="main" class="main" tabindex="-1">
+      <p class="placeholder">Loading reports…</p>
+    </main>
+  </div>
+
+  <script src="/vendor/chart.js/chart.umd.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
