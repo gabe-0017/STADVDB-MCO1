@@ -1,0 +1,2 @@
+check_name,expected,actual,result
+"fact rows whose date, amount or balance differs from financedata.trans",0,0,PASS

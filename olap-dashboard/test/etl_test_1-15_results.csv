@@ -1,0 +1,16 @@
+check_name,expected,actual,result
+"dim_date rows",2191,2191,PASS
+"dim_date min / max full_date","1993-01-01 / 1998-12-31","1993-01-01 / 1998-12-31",PASS
+"dim_location rows",76,76,PASS
+"dim_account rows",4500,4500,PASS
+"dim_account card_type","none 3608 / classic 659 / junior 145 / gold 88","none 3608 / classic 659 / junior 145 / gold 88",PASS
+"dim_account loan_status","A 203 / B 31 / C 403 / D 45 / NULL 3818","A 203 / B 31 / C 403 / D 45 / NULL 3818",PASS
+"dim_account loan_status_desc = No loan",3818,3818,PASS
+"dim_account num_clients = 2",869,869,PASS
+"dim_trans_type rows",14,14,PASS
+"dim_trans_type rows still VYBER or blank operation",0,0,PASS
+"fact rows (same as financedata.trans)",1056320,1056320,PASS
+"fact ROUND(SUM(amount), 1) (same as source)",6257793560.3,6257793560.3,PASS
+"fact rows: Debit / Withdrawal in Cash / Regular (incl. 16,666 VYBER)",274675,274675,PASS
+"fact rows: Credit / Interest Credited (blank operation)",183114,183114,PASS
+"fact rows whose district_id <> account.district_id",0,0,PASS

@@ -1,0 +1,15 @@
+trans_type_id,type,operation,k_symbol,expected,actual,result
+1,Credit,"Collection from Another Bank","Old-age Pension Payment",30338,30338,PASS
+2,Credit,"Collection from Another Bank","Regular Transaction",34888,34888,PASS
+3,Credit,"Credit in Cash","Regular Transaction",156743,156743,PASS
+4,Credit,"Interest Credited","Interest Credited",183114,183114,PASS
+5,"Debit (Withdrawal)","Credit Card Withdrawal","Regular Transaction",8036,8036,PASS
+6,"Debit (Withdrawal)","Remittance to Another Bank","Household Payment",115254,115254,PASS
+7,"Debit (Withdrawal)","Remittance to Another Bank","Insurance Payment",18477,18477,PASS
+8,"Debit (Withdrawal)","Remittance to Another Bank","Loan Payment",13580,13580,PASS
+9,"Debit (Withdrawal)","Remittance to Another Bank","Regular Transaction",60972,60972,PASS
+10,"Debit (Withdrawal)","Withdrawal in Cash","Household Payment",2811,2811,PASS
+11,"Debit (Withdrawal)","Withdrawal in Cash","Insurance Payment",23,23,PASS
+12,"Debit (Withdrawal)","Withdrawal in Cash","Payment of Statement",155832,155832,PASS
+13,"Debit (Withdrawal)","Withdrawal in Cash","Regular Transaction",274675,274675,PASS
+14,"Debit (Withdrawal)","Withdrawal in Cash","Sanction Interest if Negative Balance",1577,1577,PASS
