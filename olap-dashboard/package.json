@@ -5,7 +5,8 @@
   "description": "OLAP dashboard for the financedata_dw data warehouse (STADVDB MCO1)",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node test/olap-tests.js"
   },
   "engines": {
     "node": ">=18"
