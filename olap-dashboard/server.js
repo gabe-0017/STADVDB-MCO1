@@ -67,6 +67,45 @@ app.get('/api/meta', async (req, res) => {
   });
 });
 
+/**
+ * MySQL's own estimate of what a query costs, from EXPLAIN FORMAT=JSON (no rows are read).
+ * The number is in the optimizer's abstract cost units. null if it can't be read.
+ */
+async function estimateCost(sql) {
+  try {
+    const [rows] = await pool.query({ sql: `EXPLAIN FORMAT=JSON ${sql}`, timeout: QUERY_TIMEOUT_MS });
+    const plan = JSON.parse(rows[0].EXPLAIN);
+    const cost = plan.query_block?.cost_info?.query_cost // explain_json_format_version 1
+      ?? plan.estimated_total_cost; // explain_json_format_version 2
+    return cost === undefined ? null : Number(cost);
+  } catch {
+    return null; // a missing estimate shouldn't stop the report from showing
+  }
+}
+
+/**
+ * Checks that two versions of a report returned the same rows (in any order).
+ * Measures may differ by 1 cent (DOUBLE sums added in a different order). Returns null if they match.
+ */
+function compareResults(rowsA, rowsB, measureKeys) {
+  if (rowsA.length !== rowsB.length) return `${rowsA.length} rows vs ${rowsB.length} rows`;
+  const cols = Object.keys(rowsA[0] || {});
+  const colsB = Object.keys(rowsB[0] || {});
+  if (cols.join() !== colsB.join()) return `different columns: ${cols.join(', ')} vs ${colsB.join(', ')}`;
+  const keyCols = cols.filter((c) => !measureKeys.includes(c));
+  const keyOf = (r) => JSON.stringify(keyCols.map((c) => r[c]));
+  const byKey = new Map(rowsB.map((r) => [keyOf(r), r]));
+  for (const a of rowsA) {
+    const b = byKey.get(keyOf(a));
+    if (!b) return `row ${keyOf(a)} is missing from one version`;
+    for (const c of cols) {
+      const same = typeof a[c] === 'number' && typeof b[c] === 'number' ? Math.abs(a[c] - b[c]) <= 0.011 : String(a[c]) === String(b[c]);
+      if (!same) return `row ${keyOf(a)}, ${c}: ${a[c]} vs ${b[c]}`;
+    }
+  }
+  return null;
+}
+
 // Run one report with the user's drill level, drill path, filters, and parameters
 app.post('/api/reports/:id/run', async (req, res) => {
   const report = loadReports().find((r) => r.id === req.params.id);
@@ -97,6 +136,7 @@ app.post('/api/reports/:id/run', async (req, res) => {
       rowCount: rows.length,
       truncated: rows.length > MAX_ROWS,
       ms,
+      cost: await estimateCost(built.sql),
       sql: built.sql,
       levels: built.levels,
       levelKeys: built.levelKeys,
@@ -108,6 +148,48 @@ app.post('/api/reports/:id/run', async (req, res) => {
       error: timedOut ? `The query took longer than ${QUERY_TIMEOUT_MS / 1000} s and was stopped` : err.sqlMessage || err.message,
       sql: built.sql,
       ms,
+    });
+  }
+});
+
+// Run the original/unoptimized and the optimized version of a report with the same choices.
+// Each runs twice, alternating (original, optimized, original, optimized), 
+// so both get a first run and a run with the data already in memory.
+app.post('/api/reports/:id/compare', async (req, res) => {
+  const report = loadReports().find((r) => r.id === req.params.id);
+  if (!report) return res.status(404).json({ error: 'Report not found' });
+  if (report.error) return res.status(500).json({ error: report.error });
+  if (!report.originalSql) return res.status(400).json({ error: `No original version: add reports/${report.id}.original.sql` });
+
+  const versions = {};
+  try {
+    versions.original = { sql: buildQuery({ ...report, sql: report.originalSql }, req.body || {}).sql, ms: [] };
+    versions.optimized = { sql: buildQuery(report, req.body || {}).sql, ms: [] };
+  } catch (err) {
+    return res.status(err instanceof InputError ? 400 : 500).json({ error: err.message });
+  }
+
+  const last = {};
+  let running = 'original';
+  try {
+    for (let round = 0; round < 2; round++) {
+      for (const name of ['original', 'optimized']) {
+        running = name;
+        const started = process.hrtime.bigint();
+        const [rows] = await pool.query({ sql: versions[name].sql, timeout: QUERY_TIMEOUT_MS });
+        versions[name].ms.push(Number(process.hrtime.bigint() - started) / 1e6);
+        versions[name].rowCount = rows.length;
+        last[name] = rows;
+      }
+    }
+    versions.original.cost = await estimateCost(versions.original.sql);
+    versions.optimized.cost = await estimateCost(versions.optimized.sql);
+    const difference = compareResults(last.original, last.optimized, report.measures.map((m) => m.key));
+    res.json({ ...versions, sameResults: difference === null, difference });
+  } catch (err) {
+    const timedOut = err.code === 'PROTOCOL_SEQUENCE_TIMEOUT';
+    res.status(timedOut ? 504 : 500).json({
+      error: `${running === 'original' ? 'Original' : 'Optimized'} version: ${timedOut ? `took longer than ${QUERY_TIMEOUT_MS / 1000} s and was stopped` : err.sqlMessage || err.message}`,
     });
   }
 });
