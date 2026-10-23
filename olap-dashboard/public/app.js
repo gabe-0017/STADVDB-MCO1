@@ -114,7 +114,9 @@
   function defaultState(r) {
     const params = {};
     for (const [name, p] of Object.entries(r.params || {})) params[name] = p.default;
-    return { levels: {}, path: {}, filters: {}, params, measure: null, pivot: '' };
+    const filters = {}; // a copy of the report's defaultFilters, so picking filters never changes the defaults
+    for (const [key, values] of Object.entries(r.defaultFilters || {})) filters[key] = [...values];
+    return { levels: {}, path: {}, filters, params, measure: null, pivot: '' };
   }
 
   function st() {
@@ -209,6 +211,7 @@
     }
 
     if (isObj(saved.filters)) {
+      s.filters = {}; // the saved view replaces the default filters (it may have cleared them)
       for (const fKey of r.filters) {
         const raw = saved.filters[fKey];
         const values = (Array.isArray(raw) ? raw : [raw]).filter(isScalar);
