@@ -468,3 +468,33 @@ tr:hover .cell-drill, .cell-drill:hover { text-decoration-color: currentColor; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* Original vs optimized comparison */
+.compare { margin-top: 20px; padding: 18px 20px; }
+.compare h2 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+.compare h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+.compare-status { margin: 0; color: var(--ink-2); }
+.compare-check { margin: 0 0 4px; font-weight: 500; }
+.compare-check.same { color: var(--accent); }
+.compare-check.differ { color: var(--error); }
+.compare-summary { margin: 0 0 14px; color: var(--ink-2); }
+.compare-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.compare-col { min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.compare-stats { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; margin: 0 0 12px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.compare-stats dt { color: var(--muted); }
+.compare-stats dd { margin: 0; }
+.compare-sql {
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 6px;
+  background: var(--page);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+}
+@media (max-width: 860px) {
+  .compare-grid { grid-template-columns: minmax(0, 1fr); }
+}
