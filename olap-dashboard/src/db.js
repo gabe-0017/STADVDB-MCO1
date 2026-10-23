@@ -36,4 +36,13 @@ const pool = mysql.createPool({
   dateStrings: true,
 });
 
+// MySQL itself stops any SELECT that runs longer than the dashboard's time limit. 
+// Without this, a query the dashboard has given up on keeps running inside MySQL and slows down everything after it.
+const LIMIT_MS = Number(process.env.QUERY_TIMEOUT_MS) || 120000;
+pool.on('connection', (conn) => {
+  conn.query(`SET SESSION max_execution_time = ${LIMIT_MS}`, (err) => {
+    if (err) console.warn(`Could not set max_execution_time: ${err.message}`);
+  });
+});
+
 module.exports = pool;
