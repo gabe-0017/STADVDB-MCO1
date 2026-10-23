@@ -50,7 +50,7 @@ function normalizeParams(params = {}) {
   return out;
 }
 
-function normalize(id, def, sqlFromFile) {
+function normalize(id, def, sqlFromFile, originalSql) {
   if (!def || typeof def !== 'object') throw new Error('module.exports must be an object');
 
   const report = {
@@ -86,7 +86,16 @@ function normalize(id, def, sqlFromFile) {
   if (report.hierarchies.length && !dryRun.tokensUsed.has('LEVEL')) {
     throw new Error('The report has hierarchies, so its SQL needs a {{LEVEL}} token in SELECT and GROUP BY');
   }
-
+  // The original/unoptimized version must use the same tokens, so both can run with the same choices
+  if (originalSql && originalSql.trim()) {
+    report.originalSql = originalSql;
+    try {
+      buildQuery({ ...report, sql: originalSql }, {});
+    } catch (err) {
+      throw new Error(`${id}.original.sql: ${err.message}`);
+    }
+  }
+  
   // Friendly column headings: level and filter labels, then measures, then the report's own
   const columnLabels = {};
   for (const h of Object.values(HIERARCHIES)) for (const l of h.levels) columnLabels[l.key] = l.label;
@@ -113,7 +122,10 @@ function loadReports() {
       const def = require(full);
       const sqlPath = path.join(REPORTS_DIR, `${id}.sql`);
       const sqlFromFile = fs.existsSync(sqlPath) ? fs.readFileSync(sqlPath, 'utf8') : undefined;
-      return normalize(id, def, sqlFromFile);
+      // Optional unoptimized version, shown by "Compare with original" (e.g. 01-transaction-totals.original.sql)
+      const originalPath = path.join(REPORTS_DIR, `${id}.original.sql`);
+      const originalSql = fs.existsSync(originalPath) ? fs.readFileSync(originalPath, 'utf8') : undefined;
+      return normalize(id, def, sqlFromFile, originalSql);
     } catch (err) {
       return { id, title: humanize(id), error: `reports/${file}: ${err.message}` };
     }
@@ -134,6 +146,7 @@ function publicView(r) {
     measures: r.measures,
     columnLabels: r.columnLabels,
     chart: r.chart,
+    hasOriginal: Boolean(r.originalSql),
   };
 }
 
