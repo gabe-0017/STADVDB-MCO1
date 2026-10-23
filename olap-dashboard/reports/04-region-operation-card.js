@@ -6,6 +6,7 @@ module.exports = {
   hierarchies: ['location', 'trans_type'],
   defaultLevels: { trans_type: 'operation' },
   filters: ['year', 'region', 'district', 'card_type'],
+  defaultFilters: { year: [1998], region: ['Prague'], card_type: ['classic'] },
   measures: {
     total_amount: 'Total amount (CZK)',
     transaction_count: 'Transactions',
