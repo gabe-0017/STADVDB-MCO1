@@ -60,6 +60,7 @@ function normalize(id, def, sqlFromFile, originalSql) {
     hierarchies: def.hierarchies || [],
     defaultLevels: def.defaultLevels || {},
     filters: def.filters || [],
+    defaultFilters: def.defaultFilters || {},
     params: normalizeParams(def.params),
     measures: normalizeMeasures(def.measures),
     labels: def.labels || {},
@@ -79,6 +80,11 @@ function normalize(id, def, sqlFromFile, originalSql) {
   }
   for (const f of report.filters) {
     if (!FILTERS[f]) throw new Error(`filters: unknown "${f}". Use: ${Object.keys(FILTERS).join(', ')}`);
+  }
+  // Filters already picked when the report opens (the user can change or clear them)
+  for (const [f, values] of Object.entries(report.defaultFilters)) {
+    if (!report.filters.includes(f)) throw new Error(`defaultFilters: "${f}" is not in filters`);
+    if (!Array.isArray(values) || values.length === 0) throw new Error(`defaultFilters.${f} must be a list of values, e.g. [1998]`);
   }
   if (!CHART_TYPES.includes(report.chart)) throw new Error(`chart must be one of: ${CHART_TYPES.join(', ')}`);
   // Dry run with default settings, so a typo in a token shows up as soon as the page loads
@@ -142,6 +148,7 @@ function publicView(r) {
     hierarchies: r.hierarchies,
     defaultLevels: r.defaultLevels,
     filters: r.filters,
+    defaultFilters: r.defaultFilters,
     params: r.params,
     measures: r.measures,
     columnLabels: r.columnLabels,
