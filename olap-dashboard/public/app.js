@@ -301,6 +301,7 @@
       filters: h('div', { class: 'filters', role: 'group', 'aria-label': 'Filters' }),
       body: h('div', { class: 'results-body' }),
       veil: h('div', { class: 'loading-veil', hidden: true }, h('span', { text: 'Running the query…' })),
+      compare: h('div', { class: 'compare-slot' }),
       query: h('div', { class: 'query-slot' }),
     };
     $main.replaceChildren(...[
@@ -310,6 +311,7 @@
       report.hierarchies.length ? ui.drills : null,
       ui.filters,
       h('section', { class: 'results', 'aria-live': 'polite' }, ui.body, ui.veil),
+      ui.compare,
       ui.query,
     ].filter(Boolean));
     renderControls();
@@ -573,6 +575,7 @@
     const id = report.id;
     ui.veil.hidden = false;
     if (!lastResult) ui.body.replaceChildren();
+    ui.compare.replaceChildren(); // a comparison belongs to the previous choices
 
     let res;
     let data;
@@ -685,9 +688,10 @@
     const pivotIdx = s.pivot ? columns.findIndex((c) => c.name === s.pivot) : -1;
 
     // toolbar
+    const costText = data.cost === null || data.cost === undefined ? '' : `, estimated cost ${fmtNumber(data.cost)}`;
     const metaText = data.truncated
-      ? [`Showing the first ${nf0.format(rows.length)} of `, h('strong', { text: nf0.format(data.rowCount) }), ` rows, query took ${fmtMs(data.ms)}`]
-      : [h('strong', { text: nf0.format(data.rowCount) }), ` ${data.rowCount === 1 ? 'row' : 'rows'}, query took ${fmtMs(data.ms)}`];
+      ? [`Showing the first ${nf0.format(rows.length)} of `, h('strong', { text: nf0.format(data.rowCount) }), ` rows, query took ${fmtMs(data.ms)}${costText}`]
+      : [h('strong', { text: nf0.format(data.rowCount) }), ` ${data.rowCount === 1 ? 'row' : 'rows'}, query took ${fmtMs(data.ms)}${costText}`];
 
     const controls = [];
     if (valueIdx.length > 1) {
@@ -706,6 +710,7 @@
     }
     let view = null;
     if (rows.length) controls.push(h('button', { class: 'btn', type: 'button', onclick: () => view && downloadCsv(view) }, 'Download CSV'));
+    if (report.hasOriginal) controls.push(h('button', { class: 'btn', type: 'button', onclick: runCompare }, 'Compare with original'));
 
     const bar = h('div', { class: 'results-bar' },
       h('div', { class: 'results-meta' }, metaText),
@@ -935,8 +940,78 @@
     if (lastResult) renderResults(lastResult);
   });
 
-  // query panel, CSV, errors
+  // comparison: original vs optimized
 
+  /* Runs the original and the optimized version with the current choices and shows them side by side */
+  async function runCompare() {
+    const s = st();
+    const id = report.id;
+    const seq = runSeq; // any new choice runs the report again, which changes runSeq
+    ui.compare.replaceChildren(h('div', { class: 'panel compare' }, h('p', { class: 'compare-status', text: 'Running both versions twice…' })));
+    ui.compare.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    let res;
+    let data;
+    try {
+      res = await fetch(`/api/reports/${encodeURIComponent(id)}/compare`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ levels: s.levels, path: s.path, filters: activeFilters(), params: s.params }),
+      });
+    } catch (err) {
+      data = { error: `Lost contact with the server: ${err.message}` };
+      res = { ok: false };
+    }
+    if (!data) {
+      try {
+        data = await res.json();
+      } catch {
+        data = { error: `The server answered with an error page (HTTP ${res.status}) instead of a comparison. If the app was just deployed or was asleep, wait a minute and try again.` };
+        res = { ok: false };
+      }
+    }
+    if (seq !== runSeq || !report || report.id !== id) return; // the choices or the report changed meanwhile
+    if (!res.ok) {
+      ui.compare.replaceChildren(errorBox('The comparison could not run', data.error));
+      return;
+    }
+    renderCompare(data);
+  }
+
+  function renderCompare(data) {
+    const column = (title, v) => h('div', { class: 'compare-col' },
+      h('h3', { text: title }),
+      h('dl', { class: 'compare-stats' },
+        h('dt', { text: 'Run 1' }), h('dd', { text: fmtMs(v.ms[0]) }),
+        h('dt', { text: 'Run 2' }), h('dd', { text: fmtMs(v.ms[1]) }),
+        h('dt', { text: 'Estimated cost' }), h('dd', { text: v.cost === null ? 'not available' : fmtNumber(v.cost) }),
+        h('dt', { text: 'Rows' }), h('dd', { text: nf0.format(v.rowCount) })),
+      // comment lines dropped so the two queries line up
+      h('pre', { class: 'compare-sql' }, h('code', { text: v.sql.replace(/^[ \t]*--.*(\r?\n|$)/gm, '').trim() })));
+
+    // e.g. "4.2× faster", "1.3× slower", or "about the same" when within 5%
+    const ratio = (orig, opt, better, worse) => {
+      if (!orig || !opt) return 'not available';
+      const r = orig / opt;
+      if (Math.abs(r - 1) < 0.05) return 'about the same';
+      return r > 1 ? `${r.toFixed(1)}× ${better}` : `${(1 / r).toFixed(1)}× ${worse}`;
+    };
+    // the second runs are compared (both have the data already in memory)
+    const timeRatio = ratio(data.original.ms[1], data.optimized.ms[1], 'faster', 'slower');
+    const costRatio = ratio(data.original.cost, data.optimized.cost, 'lower', 'higher');
+
+    ui.compare.replaceChildren(h('section', { class: 'panel compare', 'aria-label': 'Original vs optimized' },
+      h('h2', { text: 'Original vs optimized' }),
+      h('p', { class: `compare-check ${data.sameResults ? 'same' : 'differ'}` },
+        data.sameResults
+          ? `Same results: both versions returned the same ${nf0.format(data.optimized.rowCount)} rows.`
+          : `Results differ: ${data.difference}.`),
+      h('p', { class: 'compare-summary', text: `Optimized version: second run ${timeRatio}; estimated cost ${costRatio}.` }),
+      h('div', { class: 'compare-grid' }, column('Original', data.original), column('Optimized', data.optimized)),
+      h('p', { class: 'hint', text: 'Run 1 may include reading data from disk; run 2 usually has it in memory. Times vary between runs. Estimated cost is MySQL’s own estimate (EXPLAIN), in its cost units.' })));
+  }
+
+  // query panel, CSV, errors
+  
   function renderQuery(sql) {
     if (!sql) {
       ui.query.replaceChildren();
