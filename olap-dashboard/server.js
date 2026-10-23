@@ -10,6 +10,9 @@ const { buildQuery, InputError } = require('./src/queryBuilder');
 const PORT = Number(process.env.PORT) || 3000;
 const MAX_ROWS = Number(process.env.MAX_ROWS) || 5000;
 const QUERY_TIMEOUT_MS = Number(process.env.QUERY_TIMEOUT_MS) || 120000;
+const TIMEOUT_CODES = new Set(['PROTOCOL_SEQUENCE_TIMEOUT', 'ER_QUERY_TIMEOUT']);
+// A query stopped for taking too long (by the dashboard) [PROTOCOL_SEQUENCE_TIMEOUT]
+// or by MySQL's own max_execution_time limit (set in db.js) [ER_QUERY_TIMEOUT]
 
 // mysql2 column type codes that hold numbers.
 // Used to right-align and chart them.
@@ -143,7 +146,7 @@ app.post('/api/reports/:id/run', async (req, res) => {
     });
   } catch (err) {
     const ms = Number(process.hrtime.bigint() - started) / 1e6;
-    const timedOut = err.code === 'PROTOCOL_SEQUENCE_TIMEOUT';
+    const timedOut = TIMEOUT_CODES.has(err.code);
     res.status(timedOut ? 504 : 500).json({
       error: timedOut ? `The query took longer than ${QUERY_TIMEOUT_MS / 1000} s and was stopped` : err.sqlMessage || err.message,
       sql: built.sql,
@@ -187,7 +190,7 @@ app.post('/api/reports/:id/compare', async (req, res) => {
     const difference = compareResults(last.original, last.optimized, report.measures.map((m) => m.key));
     res.json({ ...versions, sameResults: difference === null, difference });
   } catch (err) {
-    const timedOut = err.code === 'PROTOCOL_SEQUENCE_TIMEOUT';
+    const timedOut = TIMEOUT_CODES.has(err.code);
     res.status(timedOut ? 504 : 500).json({
       error: `${running === 'original' ? 'Original' : 'Optimized'} version: ${timedOut ? `took longer than ${QUERY_TIMEOUT_MS / 1000} s and was stopped` : err.sqlMessage || err.message}`,
     });
