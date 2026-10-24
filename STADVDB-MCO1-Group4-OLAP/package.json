@@ -6,7 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node test/olap-tests.js"
+    "test": "node test/STADVDB-MCO1-Group4-Test.js"
   },
   "engines": {
     "node": ">=18"
