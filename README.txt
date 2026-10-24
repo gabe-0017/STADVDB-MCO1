@@ -30,3 +30,4 @@ LOCAL RUN TESTS
 - OLAP tests: with the dashboard running (step 4), open another cmd/terminal in the 'STADVDB-MCO1-Group4-OLAP' folder and run:
    - npm test
    - (results are printed and saved to "test/olap_test_results.csv")
+- Note: STADVDB-MCO1-Group4-Test.sql (ETL test script) and STADVDB-MCO1-Group4-Test.js (OLAP test script) are both located in "STADVDB-MCO1-Group4-OLAP/test/"
